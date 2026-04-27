@@ -1,3 +1,6 @@
 .env
 ops-state/
 .DS_Store
+
+# Workflow backups — only UC use-cases are tracked (added with git add -f)
+workflows/
