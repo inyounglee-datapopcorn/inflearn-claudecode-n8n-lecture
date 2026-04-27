@@ -1,0 +1,284 @@
+{
+  "updatedAt": "2026-04-26T17:35:16.230Z",
+  "createdAt": "2026-04-08T04:51:23.522Z",
+  "id": "Czf7dtXzgI2ABZMq",
+  "name": "[템플릿] Cartoon - 일일 카툰 생성",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "![](https://raw.githubusercontent.com/2innnnn0/assets/refs/heads/master/image/datapopcorn_logo_50px.png)\n# 데일리 만화 (AI 번역 포함)\n\n### 동작 방식\n- Calvin and Hobbes 일일 만화를 자동으로 가져옵니다.\n- 웹사이트에서 만화 이미지 URL을 추출합니다.\n- 만화 대사를 영어와 한국어(기타 언어)로 번역합니다.\n- 매일 만화와 번역본을 Discord에 게시합니다.\n\n### 설정 단계\n- 예상 소요 시간: 약 10~15분\n- **Schedule Trigger**를 사용해 매일 오전 9시에 워크플로우를 자동 실행합니다.\n- 파라미터 설정, HTTP 요청, 데이터 추출, Discord 연동 노드를 추가합니다.\n- 각 노드에 상세 설명을 추가하여 이해하기 쉽게 구성합니다.",
+        "height": 460,
+        "width": 660
+      },
+      "id": "f736bde6-b714-4b58-9e1b-ec1d3d1455bf",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -192,
+        -16
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "7e2e7a46-a91f-441b-b108-14828d410476",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -128,
+        496
+      ],
+      "typeVersion": 1.3
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "text": "Please write the original language and Korean together. \n\nEXAMPLE)\nCalvin: \"YOU'VE NEVER HAD AN OBLIGATION, AN ASSIGNMENT, OR A DEADLINE IN ALL YOUR LIFE! YOU HAVE NO RESPONSIBILITIES AT ALL! IT MUST BE NICE!\" (너는 평생 한 번도 의무, 과제, 혹은 마감일 없었잖아! 전혀 책임이 없다니! 정말 좋겠다!)\nHobbes: \"WIPE THAT INSOLENT SMIRK OFF YOUR FACE!\" (그 뻔뻔한 미소를 그만 지어!)\n",
+        "imageUrls": "={{ $json.output.cartoon_image }}",
+        "options": {}
+      },
+      "id": "af1ca8d7-3cff-4352-b99b-9a37d9e144e9",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        896,
+        496
+      ],
+      "typeVersion": 1.6,
+      "credentials": {
+        "openAiApi": {
+          "id": "2VGTGXVxR4dZHwyn",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "59d36aef-2991-4fd2-9fbe-dad9a701b40f",
+              "name": "year",
+              "type": "string",
+              "value": "={{ $now.format('yyyy') }}"
+            },
+            {
+              "id": "b6b329f2-ba08-4516-bdb9-c5d124c02110",
+              "name": "month",
+              "type": "string",
+              "value": "={{ $now.format('MM') }}"
+            },
+            {
+              "id": "3cba75d1-a281-4e14-9bf7-e0bc0cc7c768",
+              "name": "day",
+              "type": "string",
+              "value": "={{ $now.format('dd') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "89bbaa23-23ea-434c-bf69-7e25e3d87845",
+      "name": "param",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        96,
+        496
+      ],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "155eb0d1-6e7b-4041-8ea9-38315863871f",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        544,
+        720
+      ],
+      "typeVersion": 1.3,
+      "credentials": {
+        "openAiApi": {
+          "id": "2VGTGXVxR4dZHwyn",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=Please just extract the src value in the <img class=\"img-fluid Lazyloaded\"> tag from HTML below. I don't need anything other than the value.\n\ne.g.)\nEXAMPLE INPUT)\n<img class=\"img-fluid lazyloaded\" srcset=\"https://assets.amuniversal.com/5ed526b06e94013bda88005056a9545d 900w\" data-srcset=\"https://assets.amuniversal.com/5ed526b06e94013bda88005056a9545d 900w\" sizes=\"\n                       (min-width: 992px) 900px,\n                       (min-width: 768px) 600px,\n                       (min-width: 576px) 300px,\n                       900px\" width=\"100%\" alt=\"Calvin and Hobbes Comic Strip for March 03, 2023 \" src=\"https://assets.amuniversal.com/5ed526b06e94013bda88005056a9545d\">\n\n\nEXAMPLE OUTPUT)\nhttps://assets.amuniversal.com/5ed526b06e94013bda88005056a9545d\n\n--\n(INPUT)\n{{ $json.data }}",
+        "attributes": {
+          "attributes": [
+            {
+              "name": "cartoon_image",
+              "description": "EXAMPLE OUTPUT) https://assets.amuniversal.com/***"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a4c8b981-7a55-4fae-9c89-3453f3e19ca1",
+      "name": "Information Extractor",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "position": [
+        544,
+        496
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "url": "=https://www.gocomics.com/calvinandhobbes/{{ $json.year }}/{{ $json.month }}/07",
+        "options": {}
+      },
+      "id": "f1bfc91e-44de-46b4-b127-8313c398db1b",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        320,
+        496
+      ],
+      "typeVersion": 4.4,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "param": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        []
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "param",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Information Extractor": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "1NkIDCDXFz9nRp1U"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "dba73e7b-da03-47e7-b82a-75440e722631",
+  "activeVersionId": null,
+  "versionCounter": 34,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-08T04:51:23.522Z",
+      "createdAt": "2026-04-08T04:51:23.522Z",
+      "role": "workflow:owner",
+      "workflowId": "Czf7dtXzgI2ABZMq",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "updatedAt": "2026-04-08T06:29:43.923Z",
+      "createdAt": "2026-04-08T06:29:43.923Z",
+      "id": "F4sNTqGfS0s5p99r",
+      "name": "template"
+    },
+    {
+      "updatedAt": "2026-04-08T06:30:09.011Z",
+      "createdAt": "2026-04-08T06:30:09.011Z",
+      "id": "LKD4P3wtFPgPTRiO",
+      "name": "image"
+    }
+  ],
+  "activeVersion": null
+}

@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Secrets
+n8n/.env
+n8n/ops-state/
+
+# Personal / non-lecture files
+n8n-admin/
+sounds/
+test.md
+n8n_skills_create_prompt.md
+use-cases/
+
+# Claude local settings (has machine-specific absolute paths)
+.claude/settings.local.json
+# Compiled/archived skill files (source files already in repo)
+.claude/skills/*.zip

@@ -1,0 +1,352 @@
+{
+  "updatedAt": "2026-04-27T17:10:02.651Z",
+  "createdAt": "2026-04-27T17:10:02.651Z",
+  "id": "kjSs9b9cmo9LFahj",
+  "name": "UC4. [PM] 주간 스프린트 리포트 자동 생성",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "uc4-1",
+      "name": "매주 금요일 4시",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                5
+              ],
+              "triggerAtHour": 16,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "notes": "매주 금요일 오후 4시 실행"
+    },
+    {
+      "id": "uc4-2",
+      "name": "GitHub 머지 PR 조회",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        540,
+        160
+      ],
+      "parameters": {
+        "url": "={{ 'https://api.github.com/repos/' + $env.GITHUB_OWNER + '/' + $env.GITHUB_REPO + '/pulls?state=closed&sort=updated&direction=desc&per_page=30' }}",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "이번 주 머지된 PR 목록"
+    },
+    {
+      "id": "uc4-3",
+      "name": "Jira 완료 이슈 조회",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        540,
+        440
+      ],
+      "parameters": {
+        "url": "={{ $env.JIRA_BASE_URL + '/rest/api/3/search?jql=' + encodeURIComponent('project=' + $env.JIRA_PROJECT_KEY + ' AND status=Done AND updated>=-7d ORDER BY updated DESC') + '&maxResults=30' }}",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Basic ' + Buffer.from($env.JIRA_EMAIL + ':' + $env.JIRA_API_TOKEN).toString('base64') }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "이번 주 완료된 Jira 이슈"
+    },
+    {
+      "id": "uc4-4",
+      "name": "데이터 병합",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "notes": "GitHub PR + Jira 이슈 합산"
+    },
+    {
+      "id": "uc4-5",
+      "name": "리포트 프롬프트 구성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const allItems = $input.all();\nconst now = new Date();\nconst oneWeekAgo = new Date(now.getTime() - 7*24*60*60*1000);\n\nconst prs = [];\nconst issues = [];\n\nfor (const item of allItems) {\n  const d = item.json;\n  if (d.pull_request !== undefined || d.merged_at) {\n    if (d.merged_at && new Date(d.merged_at) > oneWeekAgo) {\n      prs.push(`- [${d.number}] ${d.title} (@${d.user?.login ?? 'unknown'})`);\n    }\n  } else if (d.issues !== undefined || d.key) {\n    const issueList = d.issues ?? [d];\n    for (const iss of issueList) {\n      issues.push(`- [${iss.key}] ${iss.fields?.summary ?? iss.summary ?? ''} (${iss.fields?.assignee?.displayName ?? '미배정'})`);\n    }\n  }\n}\n\nconst weekLabel = `${oneWeekAgo.toLocaleDateString('ko-KR')} ~ ${now.toLocaleDateString('ko-KR')}`;\n\nreturn [{json:{\n  model:'gpt-4o-mini',\n  messages:[\n    {role:'system', content:'PM을 위한 주간 스프린트 리포트 작성. 핵심만 간결하게.'},\n    {role:'user', content:`주간 리포트 (${weekLabel}):\\n\\n✅ 완료된 PR (${prs.length}건):\\n${prs.join('\\n')||'없음'}\\n\\n🎯 완료된 이슈 (${issues.length}건):\\n${issues.join('\\n')||'없음'}\\n\\n다음 형식으로 Notion 페이지 내용 작성:\\n1. 주요 성과 요약 (불릿 3개)\\n2. 카테고리별 완료 항목\\n3. 다음 주 예정 사항 제안`}\n  ],\n  max_tokens:1000,\n  _week: weekLabel,\n  _pr_count: prs.length,\n  _issue_count: issues.length\n}}];"
+      },
+      "notes": "PR + 이슈 데이터 합산 및 AI 프롬프트 구성"
+    },
+    {
+      "id": "uc4-6",
+      "name": "OpenAI 리포트 생성",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:$json.model, messages:$json.messages, max_tokens:$json.max_tokens}) }}",
+        "options": {}
+      },
+      "notes": "주간 리포트 AI 생성"
+    },
+    {
+      "id": "uc4-7",
+      "name": "Notion 페이지 바디 구성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const content = $json.choices[0].message.content;\nconst prev = $('리포트 프롬프트 구성').first().json;\nconst title = `주간 리포트 - ${prev._week}`;\n\nconst blocks = content.split('\\n').filter(l=>l.trim()).map(line => ({\n  object:'block', type:'paragraph',\n  paragraph:{rich_text:[{type:'text', text:{content:line}}]}\n}));\n\nreturn [{json:{\n  parent:{database_id: $env.NOTION_WEEKLY_DB_ID},\n  properties:{\n    Name:{title:[{text:{content:title}}]},\n    Date:{date:{start:new Date().toISOString().slice(0,10)}},\n    Status:{select:{name:'완료'}},\n    PR수:{number: prev._pr_count},\n    이슈수:{number: prev._issue_count}\n  },\n  children: blocks.slice(0,100)\n}}];"
+      },
+      "notes": "Notion 페이지 JSON 구조 생성"
+    },
+    {
+      "id": "uc4-8",
+      "name": "Notion 페이지 생성",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2040,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.notion.com/v1/pages",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.NOTION_API_KEY }}"
+            },
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "notes": "Notion 주간 리포트 페이지 자동 생성"
+    },
+    {
+      "id": "uc4-9",
+      "name": "Slack 완료 알림",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2340,
+        300
+      ],
+      "parameters": {
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({text:'📊 주간 스프린트 리포트가 Notion에 생성되었습니다!\\n🔗 ' + $json.url}) }}",
+        "options": {}
+      },
+      "notes": "Notion 페이지 생성 완료 알림"
+    }
+  ],
+  "connections": {
+    "매주 금요일 4시": {
+      "main": [
+        [
+          {
+            "node": "GitHub 머지 PR 조회",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Jira 완료 이슈 조회",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub 머지 PR 조회": {
+      "main": [
+        [
+          {
+            "node": "데이터 병합",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jira 완료 이슈 조회": {
+      "main": [
+        [
+          {
+            "node": "데이터 병합",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "데이터 병합": {
+      "main": [
+        [
+          {
+            "node": "리포트 프롬프트 구성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "리포트 프롬프트 구성": {
+      "main": [
+        [
+          {
+            "node": "OpenAI 리포트 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI 리포트 생성": {
+      "main": [
+        [
+          {
+            "node": "Notion 페이지 바디 구성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion 페이지 바디 구성": {
+      "main": [
+        [
+          {
+            "node": "Notion 페이지 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion 페이지 생성": {
+      "main": [
+        [
+          {
+            "node": "Slack 완료 알림",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "f302e4dc-b3f0-44a8-ba31-6adfdb032d4a",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T17:10:02.651Z",
+      "createdAt": "2026-04-27T17:10:02.651Z",
+      "role": "workflow:owner",
+      "workflowId": "kjSs9b9cmo9LFahj",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

@@ -1,0 +1,198 @@
+{
+  "updatedAt": "2026-04-26T17:35:13.117Z",
+  "createdAt": "2026-04-07T23:15:24.859Z",
+  "id": "6Se43k494us80OWB",
+  "name": "[강의] Weather - 서울 날씨",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "trigger-1",
+      "name": "수동 실행",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {},
+      "notes": "1단계: 워크플로우를 수동으로 시작합니다. 학습용이라 수동 트리거를 사용했고, 실제로는 Schedule Trigger로 매일 아침 자동 실행도 가능합니다."
+    },
+    {
+      "id": "http-1",
+      "name": "Open-Meteo 날씨 조회",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "latitude",
+              "value": "37.5665"
+            },
+            {
+              "name": "longitude",
+              "value": "126.9780"
+            },
+            {
+              "name": "current",
+              "value": "temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code"
+            },
+            {
+              "name": "timezone",
+              "value": "Asia/Seoul"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "notes": "2단계: Open-Meteo 무료 API로 서울(위도 37.5665, 경도 126.9780)의 현재 날씨를 가져옵니다. API 키가 필요 없는 공개 API입니다."
+    },
+    {
+      "id": "set-1",
+      "name": "날씨 메시지 만들기",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "도시",
+              "type": "string",
+              "value": "서울"
+            },
+            {
+              "id": "a2",
+              "name": "기온",
+              "type": "string",
+              "value": "={{ $json.current.temperature_2m }}°C"
+            },
+            {
+              "id": "a3",
+              "name": "습도",
+              "type": "string",
+              "value": "={{ $json.current.relative_humidity_2m }}%"
+            },
+            {
+              "id": "a4",
+              "name": "풍속",
+              "type": "string",
+              "value": "={{ $json.current.wind_speed_10m }} km/h"
+            },
+            {
+              "id": "a5",
+              "name": "측정시각",
+              "type": "string",
+              "value": "={{ $json.current.time }}"
+            },
+            {
+              "id": "a6",
+              "name": "메시지",
+              "type": "string",
+              "value": "=🌤️ 서울 현재 날씨\n기온: {{ $json.current.temperature_2m }}°C\n습도: {{ $json.current.relative_humidity_2m }}%\n풍속: {{ $json.current.wind_speed_10m }} km/h\n측정: {{ $json.current.time }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "3단계: HTTP 응답에서 필요한 값만 골라 사람이 읽기 좋은 형태로 정리합니다. {{ $json.필드명 }} 표현식이 n8n의 핵심입니다."
+    }
+  ],
+  "connections": {
+    "수동 실행": {
+      "main": [
+        [
+          {
+            "node": "Open-Meteo 날씨 조회",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open-Meteo 날씨 조회": {
+      "main": [
+        [
+          {
+            "node": "날씨 메시지 만들기",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "1NkIDCDXFz9nRp1U"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "3b4532f8-4ee6-4b69-ab04-4e7de616db6e",
+  "activeVersionId": null,
+  "versionCounter": 8,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-07T23:15:24.859Z",
+      "createdAt": "2026-04-07T23:15:24.859Z",
+      "role": "workflow:owner",
+      "workflowId": "6Se43k494us80OWB",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "updatedAt": "2026-04-08T06:30:04.262Z",
+      "createdAt": "2026-04-08T06:30:04.262Z",
+      "id": "bB3ztpwEqVclCOAv",
+      "name": "teaching"
+    },
+    {
+      "updatedAt": "2026-04-08T06:30:24.383Z",
+      "createdAt": "2026-04-08T06:30:24.383Z",
+      "id": "lS1iJEg9ZO1v4g1e",
+      "name": "beginner"
+    },
+    {
+      "updatedAt": "2026-04-08T06:30:24.391Z",
+      "createdAt": "2026-04-08T06:30:24.391Z",
+      "id": "wme687L4AdCaApMS",
+      "name": "api"
+    }
+  ],
+  "activeVersion": null
+}

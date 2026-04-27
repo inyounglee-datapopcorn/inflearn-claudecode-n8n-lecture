@@ -1,0 +1,242 @@
+{
+  "updatedAt": "2026-04-08T06:30:23.760Z",
+  "createdAt": "2026-04-08T05:50:22.877Z",
+  "id": "1NkIDCDXFz9nRp1U",
+  "name": "[에러] Global - Telegram 알림",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6bc5bef1-2356-4547-b8b6-77d4b1983365",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09SNMPJAN7",
+          "mode": "list",
+          "cachedResultName": "test-workflow"
+        },
+        "text": "=👻 Exception @DEMO\nWorkflow: {{ $json.workflow.name }}\nUrl: {{ $json.execution.url }}\n{{ $json.execution.error.message }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "42f2e2c9-40f7-4201-86c5-892b212863d3",
+      "name": "👻 Exception Alert",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        208,
+        0
+      ],
+      "webhookId": "ce7e102d-a603-48c5-a98d-cf77c12a425f",
+      "notesInFlow": true,
+      "typeVersion": 2.4,
+      "credentials": {
+        "slackApi": {
+          "id": "eOrseztWQ59hCoro",
+          "name": "Slack account"
+        }
+      },
+      "notes": "#demo-n8n-error"
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "👻 Exception Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "Etc/UTC",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+  "activeVersionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+  "versionCounter": 22,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-08T05:50:22.877Z",
+      "createdAt": "2026-04-08T05:50:22.877Z",
+      "role": "workflow:owner",
+      "workflowId": "1NkIDCDXFz9nRp1U",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "updatedAt": "2026-04-08T06:30:23.812Z",
+      "createdAt": "2026-04-08T06:30:23.812Z",
+      "id": "lY4Y47z3WxbAfTqu",
+      "name": "error-handler"
+    },
+    {
+      "updatedAt": "2026-04-08T06:30:04.277Z",
+      "createdAt": "2026-04-08T06:30:04.277Z",
+      "id": "qnyAWh2DVeILT3eF",
+      "name": "active"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-04-08T06:10:28.005Z",
+    "createdAt": "2026-04-08T06:10:16.915Z",
+    "versionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+    "workflowId": "1NkIDCDXFz9nRp1U",
+    "nodes": [
+      {
+        "parameters": {},
+        "id": "6bc5bef1-2356-4547-b8b6-77d4b1983365",
+        "name": "Error Trigger",
+        "type": "n8n-nodes-base.errorTrigger",
+        "position": [
+          0,
+          0
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "value": "C09SNMPJAN7",
+            "mode": "list",
+            "cachedResultName": "test-workflow"
+          },
+          "text": "=👻 Exception @DEMO\nWorkflow: {{ $json.workflow.name }}\nUrl: {{ $json.execution.url }}\n{{ $json.execution.error.message }}",
+          "otherOptions": {
+            "includeLinkToWorkflow": false
+          }
+        },
+        "id": "42f2e2c9-40f7-4201-86c5-892b212863d3",
+        "name": "👻 Exception Alert",
+        "type": "n8n-nodes-base.slack",
+        "position": [
+          208,
+          0
+        ],
+        "webhookId": "ce7e102d-a603-48c5-a98d-cf77c12a425f",
+        "notesInFlow": true,
+        "typeVersion": 2.4,
+        "credentials": {
+          "slackApi": {
+            "id": "eOrseztWQ59hCoro",
+            "name": "Slack account"
+          }
+        },
+        "notes": "#demo-n8n-error"
+      }
+    ],
+    "connections": {
+      "Error Trigger": {
+        "main": [
+          [
+            {
+              "node": "👻 Exception Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "dev dev",
+    "name": "Version 28f16ece",
+    "description": "",
+    "autosaved": true,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-08T06:10:28.003Z",
+        "id": 6,
+        "workflowId": "1NkIDCDXFz9nRp1U",
+        "versionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+        "event": "activated",
+        "userId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      },
+      {
+        "createdAt": "2026-04-08T06:26:30.693Z",
+        "id": 18,
+        "workflowId": "1NkIDCDXFz9nRp1U",
+        "versionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+        "event": "deactivated",
+        "userId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      },
+      {
+        "createdAt": "2026-04-08T06:26:30.699Z",
+        "id": 19,
+        "workflowId": "1NkIDCDXFz9nRp1U",
+        "versionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+        "event": "activated",
+        "userId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      },
+      {
+        "createdAt": "2026-04-08T06:27:38.675Z",
+        "id": 24,
+        "workflowId": "1NkIDCDXFz9nRp1U",
+        "versionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+        "event": "deactivated",
+        "userId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      },
+      {
+        "createdAt": "2026-04-08T06:27:38.687Z",
+        "id": 25,
+        "workflowId": "1NkIDCDXFz9nRp1U",
+        "versionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+        "event": "activated",
+        "userId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      },
+      {
+        "createdAt": "2026-04-08T06:30:23.783Z",
+        "id": 30,
+        "workflowId": "1NkIDCDXFz9nRp1U",
+        "versionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+        "event": "deactivated",
+        "userId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      },
+      {
+        "createdAt": "2026-04-08T06:30:23.791Z",
+        "id": 31,
+        "workflowId": "1NkIDCDXFz9nRp1U",
+        "versionId": "28f16ece-8e4c-4d2d-a05d-8329fb30e4d0",
+        "event": "activated",
+        "userId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    ]
+  }
+}

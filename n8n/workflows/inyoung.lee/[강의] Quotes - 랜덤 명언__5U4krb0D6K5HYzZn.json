@@ -1,0 +1,157 @@
+{
+  "updatedAt": "2026-04-26T17:35:11.971Z",
+  "createdAt": "2026-04-07T09:02:04.510Z",
+  "id": "5U4krb0D6K5HYzZn",
+  "name": "[강의] Quotes - 랜덤 명언",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "1",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {},
+      "notes": "▶️ 1단계: 이 노드를 클릭한 뒤 'Test workflow' 버튼을 눌러 워크플로우를 실행합니다."
+    },
+    {
+      "id": "2",
+      "name": "랜덤 명언 가져오기 (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.quotable.io/random",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "notes": "🌐 2단계: 무료 공개 API(quotable.io)에서 랜덤 명언 1개를 JSON으로 받아옵니다. SSL 검증 무시 옵션 활성화됨."
+    },
+    {
+      "id": "3",
+      "name": "결과 가공 (Set)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "quote",
+              "value": "={{ $json.content }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "author",
+              "value": "={{ $json.author }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "message",
+              "value": "=\"{{ $json.content }}\" — {{ $json.author }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "✏️ 3단계: 이전 노드의 JSON에서 필요한 필드만 골라 정리합니다. 표현식 {{ $json.필드명 }}으로 값을 참조."
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "랜덤 명언 가져오기 (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "랜덤 명언 가져오기 (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "결과 가공 (Set)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "1NkIDCDXFz9nRp1U"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "7f15b5de-1d02-4039-849a-ddc655bebd4c",
+  "activeVersionId": null,
+  "versionCounter": 8,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-07T09:02:04.510Z",
+      "createdAt": "2026-04-07T09:02:04.510Z",
+      "role": "workflow:owner",
+      "workflowId": "5U4krb0D6K5HYzZn",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "updatedAt": "2026-04-08T06:30:04.262Z",
+      "createdAt": "2026-04-08T06:30:04.262Z",
+      "id": "bB3ztpwEqVclCOAv",
+      "name": "teaching"
+    },
+    {
+      "updatedAt": "2026-04-08T06:30:24.383Z",
+      "createdAt": "2026-04-08T06:30:24.383Z",
+      "id": "lS1iJEg9ZO1v4g1e",
+      "name": "beginner"
+    },
+    {
+      "updatedAt": "2026-04-08T06:30:24.391Z",
+      "createdAt": "2026-04-08T06:30:24.391Z",
+      "id": "wme687L4AdCaApMS",
+      "name": "api"
+    }
+  ],
+  "activeVersion": null
+}

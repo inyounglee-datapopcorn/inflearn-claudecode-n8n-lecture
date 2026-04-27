@@ -1,0 +1,127 @@
+{
+  "updatedAt": "2026-04-27T00:15:16.260Z",
+  "createdAt": "2026-04-26T23:49:37.343Z",
+  "id": "WRgwOUecKTuRk2LJ",
+  "name": "날씨 알림 자동화",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b1",
+      "name": "수동 트리거",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        304
+      ],
+      "notes": "실습용 수동 실행 트리거"
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current_weather=true",
+        "options": {}
+      },
+      "id": "b2",
+      "name": "날씨 API 호출",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        544,
+        304
+      ],
+      "notes": "[의도적 에러] 존재하지 않는 도메인 — 연결 에러 유발"
+    },
+    {
+      "parameters": {
+        "jsCode": "const weather = $input.first().json.current_weather;\nreturn [{ json: { message: `오늘 서울 날씨: ${weather.temperature}°C (풍속 ${weather.windspeed}km/h)` } }];"
+      },
+      "id": "b3",
+      "name": "알림 메시지 생성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        304
+      ],
+      "notes": "API 성공 시 메시지 조합"
+    },
+    {
+      "parameters": {
+        "content": "날씨 알림 자동화 — 연결 에러\n  getaddrinfo ENOTFOUND api.weather-invalid-demo-99999.xyz\n  - 수정 포인트: 날씨 API 호출 노드의 URL을 유효한 엔드포인트로 교체",
+        "height": 96,
+        "width": 608
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        480,
+        176
+      ],
+      "id": "3a14ae49-e918-47ca-86c2-4c62fdce9a60",
+      "name": "Sticky Note"
+    }
+  ],
+  "connections": {
+    "수동 트리거": {
+      "main": [
+        [
+          {
+            "node": "날씨 API 호출",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "날씨 API 호출": {
+      "main": [
+        [
+          {
+            "node": "알림 메시지 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "a593493e-6a21-4c78-947c-0c9e35911f87",
+  "activeVersionId": null,
+  "versionCounter": 5,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-26T23:49:37.343Z",
+      "createdAt": "2026-04-26T23:49:37.343Z",
+      "role": "workflow:owner",
+      "workflowId": "WRgwOUecKTuRk2LJ",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

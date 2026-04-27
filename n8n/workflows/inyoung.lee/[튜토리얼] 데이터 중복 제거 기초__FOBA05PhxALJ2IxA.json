@@ -1,0 +1,223 @@
+{
+  "updatedAt": "2026-04-27T16:33:28.198Z",
+  "createdAt": "2026-04-27T16:30:15.002Z",
+  "id": "FOBA05PhxALJ2IxA",
+  "name": "[튜토리얼] 데이터 중복 제거 기초",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "81dd117a-81f3-4dff-a7c7-664bc161987e",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -416,
+        80
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "# 🧱 데이터 중복 제거 튜토리얼\n\n**작성자:** David Olusola\n\n## 🚀 n8n 코칭\nn8n의 잠재력을 1:1 맞춤 코칭으로 최대한 발휘해보세요. 이제 막 시작하셨거나 특정 문제 해결이 필요하신 분께, 단계별로 자신감 있고 효율적으로 워크플로우를 만들 수 있도록 도와드립니다.\n\n👉 [코칭 세션 예약](mailto:david@daexai.com?subject=n8n%20Coaching%20Request)\n\n## 🔧 n8n 컨설팅\n복잡한 자동화 프로젝트, 특수한 연동 요구사항, 또는 맞춤형 워크플로우 구축이 필요하신가요? 함께 비즈니스에 최적화된 솔루션을 설계하고 구현해드립니다.\n\n📩 [컨설팅 문의하기](mailto:david@daexai.com?subject=n8n%20Consultation%20Request)",
+        "height": 580,
+        "width": 400,
+        "color": 7
+      },
+      "id": "6f507b8c-8a8d-4c89-acdf-f0f4eda9fa94",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -568,
+        -340
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 📊 샘플 데이터\n\n이 노드는 이메일 주소 기준으로 의도적인 중복이 포함된 사용자 샘플 데이터를 생성합니다.\n\n**이 노드가 하는 일:**\n- 사용자 배열 생성\n- 중복 항목 포함 (동일 이메일)\n- 실제 현장에서 볼 수 있는 지저분한 데이터 시뮬레이션\n\n**다음 단계:** 이 데이터를 중복 제거 코드 노드로 전달",
+        "height": 360,
+        "width": 300,
+        "color": 7
+      },
+      "id": "eadab384-f0d6-48b1-b4dd-e0eb106228ac",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -240,
+        224
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 🧹 중복 제거 로직\n\n**핵심 개념:**\n- `filter()` - 조건에 맞는 요소만 담은 새 배열 생성\n- `findIndex()` - 조건에 일치하는 첫 번째 요소의 인덱스 반환\n- `index === self.findIndex()` - 첫 번째로 등장한 항목만 유지\n\n**알고리즘:**\n1. JSON 데이터 파싱\n2. 이메일 기준으로 첫 번째 등장 항목만 필터링\n3. n8n 형식으로 재변환\n4. 중복 제거된 결과 반환",
+        "height": 380,
+        "width": 300,
+        "color": 7
+      },
+      "id": "745ba692-ffa8-4ac6-851f-fb9dde8392f2",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        112,
+        224
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## 📈 실행 결과\n\n**확인할 수 있는 내용:**\n- 원본 건수: 6개\n- 중복 제거 후: 4개\n- 삭제된 중복: 2개\n\n**활용 사례:**\n- CRM 가져오기 전 데이터 정제\n- 데이터베이스 중복 등록 방지\n- 데이터 품질 향상\n- ETL 파이프라인 정리",
+        "height": 380,
+        "width": 300,
+        "color": 7
+      },
+      "id": "8bc4bd06-b031-4909-8210-5ec1f11366ff",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        464,
+        224
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create sample data with intentional duplicates\nconst usersWithDuplicates = [\n  { id: 1, name: \"John Doe\", email: \"john@example.com\", department: \"Engineering\" },\n  { id: 2, name: \"Jane Smith\", email: \"jane@example.com\", department: \"Marketing\" },\n  { id: 3, name: \"John Doe\", email: \"john@example.com\", department: \"Engineering\" }, // Duplicate\n  { id: 4, name: \"Bob Johnson\", email: \"bob@example.com\", department: \"Sales\" },\n  { id: 5, name: \"Alice Brown\", email: \"alice@example.com\", department: \"HR\" },\n  { id: 6, name: \"Jane Smith Updated\", email: \"jane@example.com\", department: \"Marketing\" } // Duplicate\n];\n\nreturn [{\n  json: {\n    usersJson: JSON.stringify(usersWithDuplicates),\n    totalCount: usersWithDuplicates.length,\n    message: \"Sample data with duplicates created\"\n  }\n}];"
+      },
+      "id": "75a624be-73e9-4b35-ae58-33bc45a0208c",
+      "name": "Create Sample Data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -192,
+        80
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🧱 Data Deduplication Code Node\n// Use Case: Clean up duplicates before inserting into DB or CRM\n\nconst users = JSON.parse(items[0].json.usersJson);\n\nconst uniqueUsers = users.filter(\n  (user, index, self) => \n    index === self.findIndex(u => u.email === user.email)\n);\n\nconsole.log(`Original count: ${users.length}`);\nconsole.log(`Deduplicated count: ${uniqueUsers.length}`);\nconsole.log(`Duplicates removed: ${users.length - uniqueUsers.length}`);\n\nreturn uniqueUsers.map(user => ({ json: user }));"
+      },
+      "id": "909634f2-52ad-4f98-aad0-7c3d8a8b8e43",
+      "name": "Deduplicate Users",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        32,
+        80
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const currentItems = items;\nconst uniqueCount = currentItems.length;\n\nconst summary = {\n  deduplicated_users: currentItems.map(item => item.json),\n  statistics: {\n    unique_users_count: uniqueCount,\n    process_completed: true,\n    timestamp: new Date().toISOString()\n  },\n  message: `Successfully deduplicated data - ${uniqueCount} unique users remaining`\n};\n\nreturn [{ json: summary }];"
+      },
+      "id": "59855549-51e4-42df-b586-730ff1e59e67",
+      "name": "Display Results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        256,
+        80
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "content": "## 🎯 학습 목표\n\n**이 튜토리얼을 마치면 이해할 수 있어요:**\n\n✅ n8n에서 JavaScript 배열 메서드 활용법\n✅ 데이터 중복 제거 기법\n✅ Code 노드에서 JSON 데이터 다루기\n✅ n8n 아이템 간 데이터 변환\n✅ 데이터 정제의 실제 활용 사례\n\n**모범 사례:**\n- 항상 입력 데이터 유효성 검사\n- 대용량 데이터셋의 성능 고려\n- 다양한 중복 시나리오로 테스트\n- 운영 환경에서는 오류 처리 추가",
+        "height": 330,
+        "width": 430,
+        "color": 7
+      },
+      "id": "2a5c40fc-ff56-4e54-b06e-4c56e2c4da0e",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -144,
+        -240
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "![DataPopcorn](https://raw.githubusercontent.com/2innnnn0/assets/refs/heads/master/image/datapopcorn_logo_50px.png)\n\n© 2026 DataPopcorn. All rights reserved.\n이 워크플로우는 DataPopcorn이 제작한 교육용 자료입니다.",
+        "width": 400,
+        "color": 5
+      },
+      "id": "logo-watermark-note",
+      "name": "Sticky Note Logo",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -656,
+        352
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Deduplicate Users": {
+      "main": [
+        [
+          {
+            "node": "Display Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Sample Data": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Create Sample Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "f2aa10b1-229b-415e-a1c9-daf851bd9d9a",
+  "activeVersionId": null,
+  "versionCounter": 3,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T16:30:15.002Z",
+      "createdAt": "2026-04-27T16:30:15.002Z",
+      "role": "workflow:owner",
+      "workflowId": "FOBA05PhxALJ2IxA",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

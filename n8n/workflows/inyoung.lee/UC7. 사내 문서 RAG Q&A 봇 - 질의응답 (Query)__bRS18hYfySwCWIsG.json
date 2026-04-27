@@ -1,0 +1,319 @@
+{
+  "updatedAt": "2026-04-27T17:13:51.083Z",
+  "createdAt": "2026-04-27T17:13:51.083Z",
+  "id": "bRS18hYfySwCWIsG",
+  "name": "UC7. 사내 문서 RAG Q&A 봇 - 질의응답 (Query)",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "q1",
+      "name": "Slack ask Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "path": "slack-ask",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Slack /ask 슬래시 커맨드 수신",
+      "webhookId": "2c40b48a-ffeb-4d7a-9db2-eb926b4d092d"
+    },
+    {
+      "id": "q2",
+      "name": "즉시 응답",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        540,
+        160
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseBody": "{\"text\":\"답변 검색 중... ⏳\"}"
+        }
+      },
+      "notes": "3초 제한 대응 즉시 응답"
+    },
+    {
+      "id": "q3",
+      "name": "질문 파싱",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        440
+      ],
+      "parameters": {
+        "jsCode": "const b=$json.body;\nreturn [{json:{question:b.text??'',userId:b.user_id??'',responseUrl:b.response_url??''}}];"
+      },
+      "notes": "Slack 커맨드 파라미터 파싱"
+    },
+    {
+      "id": "q4",
+      "name": "질문 임베딩",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        840,
+        440
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/embeddings",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'text-embedding-3-small',input:$json.question}) }}",
+        "options": {}
+      },
+      "notes": "질문 벡터 변환"
+    },
+    {
+      "id": "q5",
+      "name": "Pinecone 검색",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1140,
+        440
+      ],
+      "parameters": {
+        "url": "={{ 'https://' + $env.PINECONE_INDEX_HOST + '/query' }}",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "={{ $env.PINECONE_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({vector:$json.data[0].embedding,topK:5,includeMetadata:true}) }}",
+        "options": {}
+      },
+      "notes": "유사 문서 Top-5 검색"
+    },
+    {
+      "id": "q6",
+      "name": "RAG 컨텍스트",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        440
+      ],
+      "parameters": {
+        "jsCode": "const matches=$json.matches??[];\nconst q=$('질문 파싱').first().json;\nconst ctx=matches.map((m,i)=>`[${i+1}] ${m.metadata?.title??''}\\n${m.metadata?.text??''}\\n출처: ${m.metadata?.url??''}`).join('\\n\\n');\nconst sources=matches.map(m=>m.metadata?.url??'').filter(Boolean).join('\\n');\nreturn [{json:{responseUrl:q.responseUrl,sources,model:'gpt-4o-mini',messages:[{role:'system',content:'사내문서 Q&A. 컨텍스트만 사용. 모르면 \"문서에 없는 내용\"으로 답변'},{role:'user',content:`컨텍스트:\\n${ctx}\\n\\n질문: ${q.question}`}],max_tokens:600}}];"
+      },
+      "notes": "검색 결과로 RAG 프롬프트 구성"
+    },
+    {
+      "id": "q7",
+      "name": "OpenAI 답변",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1740,
+        440
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:$json.model,messages:$json.messages,max_tokens:$json.max_tokens}) }}",
+        "options": {}
+      },
+      "notes": "RAG 기반 최종 답변 생성"
+    },
+    {
+      "id": "q8",
+      "name": "Slack 메시지 구성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        440
+      ],
+      "parameters": {
+        "jsCode": "const ans=$json.choices[0].message.content;\nconst ctx=$('RAG 컨텍스트').first().json;\nreturn [{json:{responseUrl:ctx.responseUrl,payload:{response_type:'in_channel',blocks:[{type:'section',text:{type:'mrkdwn',text:`🤖 *Q&A 답변*\\n\\n${ans}`}},...(ctx.sources?[{type:'context',elements:[{type:'mrkdwn',text:`📚 출처:\\n${ctx.sources}`}]}]:[])]  }}}];"
+      },
+      "notes": "Slack Block Kit 포맷 구성"
+    },
+    {
+      "id": "q9",
+      "name": "비동기 답변 전송",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2340,
+        440
+      ],
+      "parameters": {
+        "url": "={{ $json.responseUrl }}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {}
+      },
+      "notes": "Slack response_url 비동기 전송"
+    }
+  ],
+  "connections": {
+    "Slack ask Webhook": {
+      "main": [
+        [
+          {
+            "node": "즉시 응답",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "질문 파싱",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "질문 파싱": {
+      "main": [
+        [
+          {
+            "node": "질문 임베딩",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "질문 임베딩": {
+      "main": [
+        [
+          {
+            "node": "Pinecone 검색",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone 검색": {
+      "main": [
+        [
+          {
+            "node": "RAG 컨텍스트",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAG 컨텍스트": {
+      "main": [
+        [
+          {
+            "node": "OpenAI 답변",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI 답변": {
+      "main": [
+        [
+          {
+            "node": "Slack 메시지 구성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack 메시지 구성": {
+      "main": [
+        [
+          {
+            "node": "비동기 답변 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "0705891b-af89-4e24-8822-4c8ad1288503",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T17:13:51.083Z",
+      "createdAt": "2026-04-27T17:13:51.083Z",
+      "role": "workflow:owner",
+      "workflowId": "bRS18hYfySwCWIsG",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

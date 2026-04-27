@@ -1,0 +1,261 @@
+{
+  "updatedAt": "2026-04-27T17:12:14.321Z",
+  "createdAt": "2026-04-27T17:12:14.321Z",
+  "id": "ZDtDxeRl4NogCzwS",
+  "name": "UC6. [개발자] GitHub PR AI 리뷰봇",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "uc6-1",
+      "name": "GitHub PR Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "path": "github-pr-webhook",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "GitHub에서 PR 이벤트 수신",
+      "webhookId": "afa2f880-cea0-4570-b0ad-0b6eca4826f8"
+    },
+    {
+      "id": "uc6-2",
+      "name": "즉시 200 응답",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        540,
+        160
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "notes": "GitHub 재전송 막는 즉시 응답"
+    },
+    {
+      "id": "uc6-3",
+      "name": "PR opened 필터",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        540,
+        440
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "opened",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "notes": "PR이 새로 열렸을 때만 처리"
+    },
+    {
+      "id": "uc6-4",
+      "name": "GitHub 변경 파일 조회",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        840,
+        440
+      ],
+      "parameters": {
+        "url": "={{ $json.body.pull_request.url + '/files' }}",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.GITHUB_TOKEN }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "PR 변경 파일 목록 + diff 조회"
+    },
+    {
+      "id": "uc6-5",
+      "name": "리뷰 프롬프트 구성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        440
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const files = $input.all().slice(0, 10);\nconst prData = $('PR opened 필터').first().json.body;\nconst prTitle = prData.pull_request?.title ?? 'PR';\nconst prAuthor = prData.pull_request?.user?.login ?? 'unknown';\nconst prUrl = prData.pull_request?.html_url ?? '';\nconst prDesc = prData.pull_request?.body ?? '';\n\nconst diffSummary = files.map(f => {\n  const file = f.json;\n  const patch = (file.patch ?? '').slice(0, 500);\n  return `**${file.filename}** (+${file.additions}/-${file.deletions})\\n${patch}`;\n}).join('\\n\\n---\\n\\n');\n\nreturn [{json:{\n  _pr_title: prTitle,\n  _pr_author: prAuthor,\n  _pr_url: prUrl,\n  model: 'gpt-4o',\n  messages: [\n    {role:'system', content:'GitHub PR 코드 리뷰어. 한국어로 응답. 형식: 1.요약 2.주요변경 3.잠재이슈 4.개선제안'},\n    {role:'user', content:`PR: ${prTitle}\\n작성자: @${prAuthor}\\n설명: ${prDesc.slice(0,300)}\\n\\n수정파일:\\n${diffSummary}`}\n  ],\n  max_tokens: 1000\n}}];"
+      },
+      "notes": "PR diff 요약 후 OpenAI 리뷰 프롬프트 구성"
+    },
+    {
+      "id": "uc6-6",
+      "name": "OpenAI 코드 리뷰",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1440,
+        440
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:$json.model, messages:$json.messages, max_tokens:$json.max_tokens}) }}",
+        "options": {}
+      },
+      "notes": "gpt-4o 코드 리뷰 생성"
+    },
+    {
+      "id": "uc6-7",
+      "name": "Slack 리뷰 전송",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1740,
+        440
+      ],
+      "parameters": {
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({attachments:[{color:'#0075db', title:'🔍 PR 리뷰: '+$('리뷰 프롬프트 구성').first().json._pr_title, title_link:$('리뷰 프롬프트 구성').first().json._pr_url, text:$json.choices[0].message.content, footer:'by @'+$('리뷰 프롬프트 구성').first().json._pr_author}]}) }}",
+        "options": {}
+      },
+      "notes": "Slack에 PR 리뷰 결과 전송"
+    }
+  ],
+  "connections": {
+    "GitHub PR Webhook": {
+      "main": [
+        [
+          {
+            "node": "즉시 200 응답",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PR opened 필터",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PR opened 필터": {
+      "main": [
+        [
+          {
+            "node": "GitHub 변경 파일 조회",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "GitHub 변경 파일 조회": {
+      "main": [
+        [
+          {
+            "node": "리뷰 프롬프트 구성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "리뷰 프롬프트 구성": {
+      "main": [
+        [
+          {
+            "node": "OpenAI 코드 리뷰",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI 코드 리뷰": {
+      "main": [
+        [
+          {
+            "node": "Slack 리뷰 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "2b67a951-a2fc-40fd-bde1-d4c6ba277886",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T17:12:14.321Z",
+      "createdAt": "2026-04-27T17:12:14.321Z",
+      "role": "workflow:owner",
+      "workflowId": "ZDtDxeRl4NogCzwS",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

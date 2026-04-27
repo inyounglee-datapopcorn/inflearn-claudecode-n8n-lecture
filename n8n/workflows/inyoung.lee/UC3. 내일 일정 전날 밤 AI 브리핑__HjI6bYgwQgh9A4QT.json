@@ -1,0 +1,224 @@
+{
+  "updatedAt": "2026-04-27T17:09:27.299Z",
+  "createdAt": "2026-04-27T17:09:27.299Z",
+  "id": "HjI6bYgwQgh9A4QT",
+  "name": "UC3. 내일 일정 전날 밤 AI 브리핑",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "uc3-1",
+      "name": "매일 밤 10시 실행",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtHour": 22
+            }
+          ]
+        }
+      },
+      "notes": "매일 밤 10시 KST 실행"
+    },
+    {
+      "id": "uc3-2",
+      "name": "내일 날짜 계산",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst kstOffset = 9 * 60 * 60 * 1000;\nconst kstNow = new Date(now.getTime() + kstOffset);\nconst tomorrow = new Date(kstNow);\ntomorrow.setDate(tomorrow.getDate() + 1);\ntomorrow.setHours(0,0,0,0);\nconst dayAfter = new Date(tomorrow);\ndayAfter.setDate(dayAfter.getDate() + 1);\nconst tomorrowStr = tomorrow.toISOString().replace('Z','+09:00').slice(0,19)+'+09:00';\nconst dayAfterStr = dayAfter.toISOString().replace('Z','+09:00').slice(0,19)+'+09:00';\nconst dateLabel = tomorrow.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'short'});\nreturn [{json:{timeMin:tomorrowStr, timeMax:dayAfterStr, dateLabel}}];"
+      },
+      "notes": "KST 기준 내일 날짜 범위 계산"
+    },
+    {
+      "id": "uc3-3",
+      "name": "Google Calendar 조회",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "url": "={{ 'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=' + encodeURIComponent($json.timeMin) + '&timeMax=' + encodeURIComponent($json.timeMax) + '&singleEvents=true&orderBy=startTime' }}",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "",
+          "name": "Google Calendar OAuth2"
+        }
+      },
+      "notes": "내일 Google Calendar 이벤트 전체 조회"
+    },
+    {
+      "id": "uc3-4",
+      "name": "일정 정리 + 프롬프트",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const dateLabel = $('내일 날짜 계산').first().json.dateLabel;\nconst events = $json.items ?? [];\n\nif (events.length === 0) {\n  return [{json:{\n    model:'gpt-4o-mini',\n    messages:[{role:'user', content:`내일(${dateLabel})은 일정이 없습니다. \"내일 일정 없음. 휴식 하루가 될 것 같아요!\" 형태의 짧은 슬랙 메시지를 작성해주세요.`}],\n    max_tokens:100\n  }}];\n}\n\nconst eventList = events.map(e => {\n  const start = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : '종일';\n  return `- ${start} ${e.summary ?? '(제목 없음)'}${e.location ? ' @ '+e.location : ''}`;\n}).join('\\n');\n\nreturn [{json:{\n  model:'gpt-4o-mini',\n  messages:[\n    {role:'system', content:'Google Calendar 일정 브리핑 어시스턴트. 준비물·이동시간 포함 체크리스트 작성.'},\n    {role:'user', content:`내일(${dateLabel}) 일정:\\n${eventList}\\n\\n슬랙 메시지 형식: 인사→일정목록→준비물 체크리스트→응원 한마디`}\n  ],\n  max_tokens:500\n}}];"
+      },
+      "notes": "일정 목록 정리 및 AI 프롬프트 구성"
+    },
+    {
+      "id": "uc3-5",
+      "name": "OpenAI 브리핑 생성",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "notes": "일정 기반 브리핑 + 체크리스트 생성"
+    },
+    {
+      "id": "uc3-6",
+      "name": "Slack 전송",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1740,
+        300
+      ],
+      "parameters": {
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({text: '📅 *내일 일정 브리핑*\\n\\n' + $json.choices[0].message.content}) }}",
+        "options": {}
+      },
+      "notes": "Slack #general 전송"
+    }
+  ],
+  "connections": {
+    "매일 밤 10시 실행": {
+      "main": [
+        [
+          {
+            "node": "내일 날짜 계산",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "내일 날짜 계산": {
+      "main": [
+        [
+          {
+            "node": "Google Calendar 조회",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar 조회": {
+      "main": [
+        [
+          {
+            "node": "일정 정리 + 프롬프트",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "일정 정리 + 프롬프트": {
+      "main": [
+        [
+          {
+            "node": "OpenAI 브리핑 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI 브리핑 생성": {
+      "main": [
+        [
+          {
+            "node": "Slack 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "033e59c4-6dcc-4fc5-9e76-7a0c5c124984",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T17:09:27.299Z",
+      "createdAt": "2026-04-27T17:09:27.299Z",
+      "role": "workflow:owner",
+      "workflowId": "HjI6bYgwQgh9A4QT",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

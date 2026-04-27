@@ -1,0 +1,233 @@
+{
+  "updatedAt": "2026-04-26T17:35:42.871Z",
+  "createdAt": "2026-04-08T07:38:36.140Z",
+  "id": "bpePxcO8MnPmkpbF",
+  "name": "[운영] Monitor - 신규 워크플로우 감지",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "node-schedule",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5678/api/v1/workflows",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-http",
+      "name": "n8n API - 워크플로우 목록",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        304
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "oP1jT7pXYnguB34O",
+          "name": "n8n Public API (X-N8N-API-KEY)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst response = $input.first().json;\nconst currentWorkflows = response.data || [];\n\nconst currentIds = currentWorkflows.map(w => w.id);\nconst knownIds = staticData.knownWorkflowIds || [];\n\n// 신규 워크플로우 = 현재 목록에 있지만 이전에 없던 것\nconst newWorkflows = currentWorkflows.filter(w => !knownIds.includes(w.id));\n\n// Static Data 항상 최신 목록으로 갱신\nstaticData.knownWorkflowIds = currentIds;\n\nif (newWorkflows.length === 0) {\n  return [];\n}\n\nreturn newWorkflows.map(w => ({\n  json: {\n    id: w.id,\n    name: w.name,\n    active: w.active,\n    createdAt: w.createdAt,\n    nodeCount: w.nodeCount || 0,\n    tags: (w.tags || []).map(t => t.name).join(', ') || '없음',\n    url: 'http://localhost:5678/workflow/' + w.id\n  }\n}));"
+      },
+      "id": "node-code",
+      "name": "신규 워크플로우 감지",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "C09SNMPJAN7"
+        },
+        "text": "=🆕 *신규 워크플로우 감지!*\n• *이름:* {{ $json.name }}\n• *ID:* {{ $json.id }}\n• *상태:* {{ $json.active ? '✅ 활성' : '⏸ 비활성' }}\n• *노드 수:* {{ $json.nodeCount }}개\n• *태그:* {{ $json.tags }}\n• *생성일:* {{ $json.createdAt }}\n• *링크:* {{ $json.url }}",
+        "otherOptions": {}
+      },
+      "id": "node-slack",
+      "name": "Slack - 신규 워크플로우 알림",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        928,
+        304
+      ],
+      "webhookId": "4116a266-7dc6-469a-bc75-a63344c59a94",
+      "credentials": {
+        "slackApi": {
+          "id": "QhDnTPz5SyKMQKJN",
+          "name": "Slack account (bot-test)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 1. 신규 워크플로우 알람.\n## 2. 최근 1주일간 워크플로우 통계.",
+        "height": 128,
+        "width": 352
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        208,
+        128
+      ],
+      "id": "9104739c-9b36-4d5e-b46a-66fb2a76dcae",
+      "name": "Sticky Note"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "n8n API - 워크플로우 목록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n API - 워크플로우 목록": {
+      "main": [
+        [
+          {
+            "node": "신규 워크플로우 감지",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "신규 워크플로우 감지": {
+      "main": [
+        [
+          {
+            "node": "Slack - 신규 워크플로우 알림",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "errorWorkflow": "1NkIDCDXFz9nRp1U"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    },
+    "global": {
+      "knownWorkflowIds": [
+        "5U4krb0D6K5HYzZn",
+        "6Se43k494us80OWB",
+        "GeZA7qsEH1Mg9E2r",
+        "hoZjYCDRky3obccu",
+        "Czf7dtXzgI2ABZMq",
+        "sQ8zOZkQ4Fra7d17",
+        "JTOzMgc4mnPmvUjM",
+        "cjth9O9TJZBdjFBQ",
+        "T31oxnt9nZid8dha",
+        "x8vmSXoLUgumD0HT",
+        "EoeniVMgg91cWM46",
+        "ZbjWBIJ0EmhoqPfR",
+        "Rfgd22SShYbTDeqP",
+        "EoqbNMzXzZM9iIVQ",
+        "aWnP34HqhEi0NUWV",
+        "tqggsutveRE9b56E",
+        "Gkj7clwpPaDgoEs1",
+        "xIM7ZlUzbXNC9q7i",
+        "dqYeCMKLTcIesp2s",
+        "9GTBQQbZkMQKuwXX",
+        "X9OHJqTEpvP9EdqO",
+        "6B15oAolI5G35CDF",
+        "OusSyGi4MTT4cdmJ",
+        "li5UP0vEf3nJho2O",
+        "TcDCBaNDgTKGfUjX",
+        "WEag37A0eeA7AAKG",
+        "KCc96689xt8xYa0U",
+        "V7QBysLWYw9ncGO3",
+        "1NkIDCDXFz9nRp1U",
+        "cR5VSXKKf5kU6V4H",
+        "k2aGCkxG7AEvF7Vl",
+        "bpePxcO8MnPmkpbF",
+        "r08IKPgzXneMHTE4",
+        "M0hBfzjDNys7t55W",
+        "V9g4NPLsm4etWbCg",
+        "EJpg8lMI9Xx8Pgs7"
+      ]
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "637926e2-5ae1-4ec9-8ddd-4645b28d0e59",
+  "activeVersionId": null,
+  "versionCounter": 141,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-08T07:38:36.140Z",
+      "createdAt": "2026-04-08T07:38:36.140Z",
+      "role": "workflow:owner",
+      "workflowId": "bpePxcO8MnPmkpbF",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

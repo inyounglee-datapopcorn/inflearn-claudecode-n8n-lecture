@@ -1,0 +1,389 @@
+{
+  "updatedAt": "2026-04-27T17:11:46.162Z",
+  "createdAt": "2026-04-27T17:11:46.162Z",
+  "id": "HeFhed80nrZSdTn7",
+  "name": "UC5. [마케터] 경쟁사 블로그·SNS 모니터링",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "uc5-1",
+      "name": "매일 오전 8시",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "notes": "매일 오전 8시 경쟁사 모니터링 시작"
+    },
+    {
+      "id": "uc5-2",
+      "name": "RSS - 경쟁사 1",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        540,
+        120
+      ],
+      "parameters": {
+        "url": "={{ $env.RSS_URL_1 }}",
+        "options": {}
+      },
+      "notes": "경쟁사 1 블로그 RSS"
+    },
+    {
+      "id": "uc5-3",
+      "name": "RSS - 경쟁사 2",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "url": "={{ $env.RSS_URL_2 }}",
+        "options": {}
+      },
+      "notes": "경쟁사 2 블로그 RSS"
+    },
+    {
+      "id": "uc5-4",
+      "name": "RSS - 업계 미디어",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        540,
+        480
+      ],
+      "parameters": {
+        "url": "={{ $env.RSS_URL_3 }}",
+        "options": {}
+      },
+      "notes": "업계 미디어 RSS"
+    },
+    {
+      "id": "uc5-5",
+      "name": "RSS 병합",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "notes": "3개 RSS 피드 합산"
+    },
+    {
+      "id": "uc5-6",
+      "name": "48h 필터 + 중복 제거",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const cutoff = new Date(Date.now() - 48*60*60*1000);\nconst seen = new Set();\nconst filtered = $input.all().filter(item => {\n  const pub = new Date(item.json.pubDate ?? item.json.isoDate ?? 0);\n  const url = item.json.link ?? item.json.guid ?? '';\n  if (pub < cutoff) return false;\n  if (seen.has(url)) return false;\n  seen.add(url);\n  return true;\n});\nif (filtered.length === 0) return [{json:{_empty:true, title:''}}];\nreturn filtered.map(item => ({json: item.json}));"
+      },
+      "notes": "48시간 이내 새 글만, URL 중복 제거"
+    },
+    {
+      "id": "uc5-7",
+      "name": "새 글 여부 확인",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "notes": "새 글이 있을 때만 진행"
+    },
+    {
+      "id": "uc5-8",
+      "name": "OpenAI 글 요약",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1740,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'gpt-4o-mini', messages:[{role:'system',content:'경쟁사 콘텐츠 분석. JSON으로만 응답: {\"summary\":\"요약3줄\",\"tags\":[\"태그1\",\"태그2\"],\"insight\":\"마케팅인사이트\"}'},{role:'user',content:'제목: '+$json.title+'\\n내용: '+($json.contentSnippet??$json.content??'').slice(0,800)}], max_tokens:250}) }}",
+        "options": {}
+      },
+      "notes": "각 글 요약 + 태그 + 인사이트"
+    },
+    {
+      "id": "uc5-9",
+      "name": "Notion 바디 구성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const content = $json.choices[0].message.content;\nconst prev = $input.item.json;\nlet parsed;\ntry { const m = content.match(/\\{[\\s\\S]*\\}/); parsed = m ? JSON.parse(m[0]) : {summary:content,tags:[],insight:''}; }\ncatch(e) { parsed = {summary:content,tags:[],insight:''}; }\nconst title = (prev.title??'(제목 없음)').slice(0,100);\nconst url = prev.link??'';\nconst source = (() => { try { return new URL(url).hostname; } catch(e) { return 'unknown'; } })();\nreturn [{json:{\n  _title:title, _url:url, _source:source, _summary:parsed.summary, _insight:parsed.insight,\n  parent:{database_id:$env.NOTION_MONITORING_DB_ID},\n  properties:{\n    제목:{title:[{text:{content:title}}]},\n    URL:{url},\n    출처:{rich_text:[{text:{content:source}}]},\n    요약:{rich_text:[{text:{content:parsed.summary}}]},\n    인사이트:{rich_text:[{text:{content:parsed.insight}}]},\n    날짜:{date:{start:new Date().toISOString().slice(0,10)}}\n  }\n}}];"
+      },
+      "notes": "Notion DB 페이지 구조 생성"
+    },
+    {
+      "id": "uc5-10",
+      "name": "Notion 저장",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2340,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.notion.com/v1/pages",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.NOTION_API_KEY }}"
+            },
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({parent:$json.parent, properties:$json.properties}) }}",
+        "options": {}
+      },
+      "notes": "Notion DB에 글 저장"
+    },
+    {
+      "id": "uc5-11",
+      "name": "Slack 알림",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({attachments:[{color:'#36a64f', title:'🔍 '+$('Notion 바디 구성').item.json._title, title_link:$('Notion 바디 구성').item.json._url, text:'*요약:* '+$('Notion 바디 구성').item.json._summary+'\\n💡 '+$('Notion 바디 구성').item.json._insight, footer:$('Notion 바디 구성').item.json._source}]}) }}",
+        "options": {}
+      },
+      "notes": "Slack 경쟁사 모니터링 알림"
+    }
+  ],
+  "connections": {
+    "매일 오전 8시": {
+      "main": [
+        [
+          {
+            "node": "RSS - 경쟁사 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - 경쟁사 2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - 업계 미디어",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - 경쟁사 1": {
+      "main": [
+        [
+          {
+            "node": "RSS 병합",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - 경쟁사 2": {
+      "main": [
+        [
+          {
+            "node": "RSS 병합",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "RSS - 업계 미디어": {
+      "main": [
+        [
+          {
+            "node": "RSS 병합",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "RSS 병합": {
+      "main": [
+        [
+          {
+            "node": "48h 필터 + 중복 제거",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "48h 필터 + 중복 제거": {
+      "main": [
+        [
+          {
+            "node": "새 글 여부 확인",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "새 글 여부 확인": {
+      "main": [
+        [
+          {
+            "node": "OpenAI 글 요약",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "OpenAI 글 요약": {
+      "main": [
+        [
+          {
+            "node": "Notion 바디 구성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion 바디 구성": {
+      "main": [
+        [
+          {
+            "node": "Notion 저장",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion 저장": {
+      "main": [
+        [
+          {
+            "node": "Slack 알림",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "daed5005-e375-4dcd-9317-5588e4838bbb",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T17:11:46.162Z",
+      "createdAt": "2026-04-27T17:11:46.162Z",
+      "role": "workflow:owner",
+      "workflowId": "HeFhed80nrZSdTn7",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

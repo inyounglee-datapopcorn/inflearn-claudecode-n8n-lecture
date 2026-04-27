@@ -1,0 +1,761 @@
+{
+  "updatedAt": "2026-04-27T16:35:59.226Z",
+  "createdAt": "2026-04-27T16:31:57.437Z",
+  "id": "lib72j2AXLKSYytV",
+  "name": "AI Video Generator — NanoBanana + VEO3 (Simple)",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Video Generator",
+        "formDescription": "이미지 URL과 비디오 아이디어를 입력하세요. NanoBanana로 이미지를 편집하고 VEO3로 영상을 생성합니다.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Image URL",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Description",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "n01",
+      "name": "Video Idea Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        480
+      ],
+      "webhookId": "a1b2c3d4-0001-0001-0001-000000000001"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o"
+        },
+        "text": "You are an image analysis assistant.\n\nAnalyze the given image and output results only in YAML format. No explanations.\n\n- If product: return brand_name, color_scheme (hex+name), font_style, visual_description.\n- If character: return character_name, color_scheme, outfit_style, visual_description.\n- If both: return both.\n\nOnly valid YAML, no other text.",
+        "imageUrls": "={{ $json['Image URL'] }}",
+        "options": {}
+      },
+      "id": "n02",
+      "name": "Analyze Reference Image",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        464,
+        480
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "2VGTGXVxR4dZHwyn",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o"
+        },
+        "options": {}
+      },
+      "id": "n03",
+      "name": "LLM: OpenAI Chat",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        696,
+        704
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "2VGTGXVxR4dZHwyn",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"image_prompt\": \"string\"\n}"
+      },
+      "id": "n04",
+      "name": "LLM: Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        824,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Your task is to create an image prompt following the system guidelines.\nEnsure that the reference image is represented as accurately as possible, including all text elements.\n\nUse the following inputs:\n\n- **User's description:**\n{{ $('Video Idea Form').item.json['Description'] }}\n\n- **Reference image description:**\n{{ $('Analyze Reference Image').item.json.text }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "ROLE: UGC Image Prompt Builder\n\nGOAL: Generate one concise, natural, and realistic image prompt (max 120 words) simulating authentic UGC photography.\n\nRULES:\n- Output ONE JSON object only with key: image_prompt\n- No commentary, no extra keys. JSON only.\n\nSTYLE:\n- Tone: casual, unstaged, lifelike\n- Camera: include 2-3 cues (phone snapshot, handheld, off-center, natural light, grain)\n- Realism: imperfections welcome\n- Text/packaging: preserve exactly as visible\n\nOUTPUT: JSON only, max 120 words in image_prompt."
+        }
+      },
+      "id": "n05",
+      "name": "Generate Image Prompt",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        688,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://queue.fal.run/fal-ai/nano-banana/edit",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n\t\"prompt\": \"{{ $json.output.image_prompt.replace(/\\\"/g, '\\\\\\\"').replace(/\\n/g, '\\\\n') }}\",\n\"image_urls\": [\"{{ $('Video Idea Form').item.json['Image URL'] }}\"]\n}",
+        "options": {}
+      },
+      "id": "n06",
+      "name": "NanoBanana: Create Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        480
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wl7nUo9rTCN5YdID",
+          "name": "fal.run API (NanoBanana)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "id": "n07",
+      "name": "Wait for Image Edit",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1264,
+        480
+      ],
+      "webhookId": "a1b2c3d4-0001-0001-0001-000000000002"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.response_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "n08",
+      "name": "Download Edited Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1488,
+        480
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wl7nUo9rTCN5YdID",
+          "name": "fal.run API (NanoBanana)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "mp-001",
+              "name": "json_master",
+              "type": "string",
+              "value": "{\n  \"description\": \"Brief narrative description of the scene.\",\n  \"style\": \"cinematic | photorealistic | stylized | gritty | elegant\",\n  \"camera\": {\n    \"type\": \"fixed | dolly | Steadicam | crane combo\",\n    \"movement\": \"describe any camera moves\",\n    \"lens\": \"optional lens type\"\n  },\n  \"lighting\": {\n    \"type\": \"natural | dramatic | high-contrast\",\n    \"sources\": \"key lighting sources\",\n    \"FX\": \"optional VFX elements\"\n  },\n  \"environment\": {\n    \"location\": \"describe location\",\n    \"set_pieces\": [\"key background or prop elements\"],\n    \"mood\": \"ambient atmosphere\"\n  },\n  \"elements\": [\"main physical items involved\"],\n  \"subject\": {\n    \"character\": {\"description\": \"optional\", \"pose\": \"optional\", \"lip_sync_line\": \"optional\"},\n    \"product\": {\"brand\": \"Brand name\", \"model\": \"Product model\", \"action\": \"product transformation\"}\n  },\n  \"motion\": {\"type\": \"transformation, explosion, vortex\", \"details\": \"step-by-step visual flow\"},\n  \"VFX\": {\"transformation\": \"optional\", \"impact\": \"optional\", \"particles\": \"optional\", \"environment\": \"optional\"},\n  \"audio\": {\n    \"music\": \"optional\",\n    \"sfx\": [\"sound effects\"],\n    \"ambience\": \"optional\",\n    \"voiceover\": {\"delivery\": \"tone and style\", \"line\": \"text spoken\"}\n  },\n  \"ending\": \"Final shot description\",\n  \"text\": \"none | overlay | tagline | logo pulse at end only\",\n  \"format\": \"16:9 | 4k | vertical\",\n  \"keywords\": [\"brand\", \"scene style\", \"motion type\", \"camera style\", \"sound mood\", \"target theme\"]\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n09",
+      "name": "Set Master Prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o"
+        },
+        "options": {}
+      },
+      "id": "n10",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1936,
+        704
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "2VGTGXVxR4dZHwyn",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "n11",
+      "name": "Think",
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"title\": \"string\",\n  \"final_prompt\": \"string\"\n}\n"
+      },
+      "id": "n12",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2192,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a UGC-style video prompt using both the reference image and the user description.\n\n**Inputs**\n- User description: `{{ $('Video Idea Form').item.json['Description'] }}`\n- Reference image analysis: `{{ $('Analyze Reference Image').item.json.text }}`\n\n**Rules**\n- Keep the style casual, authentic, and realistic.\n- Default model: veo3_fast\n- Output only one JSON object with the key: video_prompt.\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=## SYSTEM PROMPT: Structured Video Ad Prompt Generator\n\nGenerate a structured video ad prompt strictly based on the master schema: {{ $json.json_master }}\n\nThe final result must be a JSON object with exactly two top-level keys: `title` and `final_prompt`.\n\nConstraints:\n- The output must be valid JSON.\n- `title`: short, descriptive, unique (max 15 words).\n- `final_prompt`: a single-line JSON string following the exact structure of the master schema.\n- No explanations, markdown, or extra text.\n- Escape all inner quotes in the `final_prompt` string.\n\nExpected output format:\n{\n  \"title\": \"A unique short title for the scene\",\n  \"final_prompt\": \"{...stringified JSON of the full prompt...}\"\n}"
+        }
+      },
+      "id": "n13",
+      "name": "AI Agent: Generate Video Script",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        1992,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const structuredPrompt = $input.first().json.output.final_prompt;\nreturn {\n  json: {\n    prompt: JSON.stringify(structuredPrompt),\n    model: \"veo3_fast\",\n    aspectRatio: \"16:9\"\n  }\n};\n"
+      },
+      "id": "n14",
+      "name": "Format Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.kie.ai/api/v1/veo/generate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"prompt\": {{ $json.prompt }},\n  \"model\": \"veo3_fast\",\n  \"aspectRatio\": \"{{ $json.aspectRatio }}\",\n  \"imageUrls\": [\n    \"{{ $('Download Edited Image').item.json.images[0].url }}\"\n  ]\n}",
+        "options": {}
+      },
+      "id": "n15",
+      "name": "Generate Video with VEO3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2624,
+        480
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uYJ9KzPYW6P835gF",
+          "name": "kie.ai API (VEO3)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "id": "n16",
+      "name": "Wait for VEO3 Rendering",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2848,
+        480
+      ],
+      "webhookId": "a1b2c3d4-0001-0001-0001-000000000003"
+    },
+    {
+      "parameters": {
+        "url": "https://api.kie.ai/api/v1/veo/record-info",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "taskId",
+              "value": "={{ $('Generate Video with VEO3').item.json.data.taskId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n17",
+      "name": "Download Video from VEO3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3072,
+        480
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "uYJ9KzPYW6P835gF",
+          "name": "kie.ai API (VEO3)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are writing a short social media caption.\n\nContent idea: {{ $('Video Idea Form').item.json['Description'] }}\nVideo title: {{ $('AI Agent: Generate Video Script').item.json.output.title }}\n\nWrite a caption under 200 characters. No hashtags, no explanation. Caption text only."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n18",
+      "name": "Rewrite Caption",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        3296,
+        480
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "2VGTGXVxR4dZHwyn",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "out-001",
+              "name": "video_url",
+              "type": "string",
+              "value": "={{ $('Download Video from VEO3').item.json.data.response.resultUrls[0] }}"
+            },
+            {
+              "id": "out-002",
+              "name": "caption",
+              "type": "string",
+              "value": "={{ $('Rewrite Caption').item.json.message.content }}"
+            },
+            {
+              "id": "out-003",
+              "name": "edited_image_url",
+              "type": "string",
+              "value": "={{ $('Download Edited Image').item.json.images[0].url }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n19",
+      "name": "Set Final Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3648,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# 📥 STEP 1 — 입력\n\nForm으로\n이미지 URL과\n설명을 받습니다.",
+        "height": 348,
+        "width": 200,
+        "color": 7
+      },
+      "id": "sticky-01",
+      "name": "Step1 Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        188,
+        292
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# 🔍 STEP 2 — 이미지 분석 & 프롬프트 생성\n\nOpenAI Vision으로 이미지를 분석하고\nLLM Agent로 NanoBanana 편집 프롬프트를 생성합니다.",
+        "height": 580,
+        "width": 580,
+        "color": 5
+      },
+      "id": "sticky-02",
+      "name": "Step2 Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        398,
+        268
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# 🖼️ STEP 3 — NanoBanana 이미지 편집\n\nfal.run NanoBanana API로 이미지를 편집하고\n결과 URL을 다운로드합니다.",
+        "height": 284,
+        "width": 720,
+        "color": 3
+      },
+      "id": "sticky-03",
+      "name": "Step3 Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        952,
+        356
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# 📝 STEP 4 — 비디오 스크립트 생성\n\nAI Agent가 VEO3용 영상 프롬프트를\nJSON 스키마 형식으로 생성합니다.",
+        "height": 548,
+        "width": 640,
+        "color": 4
+      },
+      "id": "sticky-04",
+      "name": "Step4 Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1784,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# 🎬 STEP 5 — VEO3 영상 생성\n\nkie.ai VEO3 API로 영상을 생성하고 완료 후 URL을 가져옵니다.",
+        "height": 284,
+        "width": 1020,
+        "color": 4
+      },
+      "id": "sticky-05",
+      "name": "Step5 Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2274,
+        356
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# ✅ STEP 6 — 캡션 & 결과 출력\n\nGPT-4o로 캡션 작성 후\nvideo_url, caption,\nedited_image_url 반환.",
+        "height": 284,
+        "width": 500,
+        "color": 5
+      },
+      "id": "sticky-06",
+      "name": "Step6 Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3270,
+        356
+      ]
+    }
+  ],
+  "connections": {
+    "Video Idea Form": {
+      "main": [
+        [
+          {
+            "node": "Analyze Reference Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Reference Image": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM: OpenAI Chat": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Image Prompt",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM: Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Generate Image Prompt",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image Prompt": {
+      "main": [
+        [
+          {
+            "node": "NanoBanana: Create Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NanoBanana: Create Image": {
+      "main": [
+        [
+          {
+            "node": "Wait for Image Edit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Image Edit": {
+      "main": [
+        [
+          {
+            "node": "Download Edited Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Edited Image": {
+      "main": [
+        [
+          {
+            "node": "Set Master Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Master Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent: Generate Video Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent: Generate Video Script",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent: Generate Video Script",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent: Generate Video Script",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent: Generate Video Script": {
+      "main": [
+        [
+          {
+            "node": "Format Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Prompt": {
+      "main": [
+        [
+          {
+            "node": "Generate Video with VEO3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Video with VEO3": {
+      "main": [
+        [
+          {
+            "node": "Wait for VEO3 Rendering",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for VEO3 Rendering": {
+      "main": [
+        [
+          {
+            "node": "Download Video from VEO3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video from VEO3": {
+      "main": [
+        [
+          {
+            "node": "Rewrite Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rewrite Caption": {
+      "main": [
+        [
+          {
+            "node": "Set Final Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {
+    "Video Idea Form": [
+      {
+        "json": {
+          "__isTrimmedManualExecutionDataItem": true
+        }
+      }
+    ]
+  },
+  "versionId": "bd40a0ed-e268-4adb-b571-9a79eb928604",
+  "activeVersionId": null,
+  "versionCounter": 11,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T16:31:57.437Z",
+      "createdAt": "2026-04-27T16:31:57.437Z",
+      "role": "workflow:owner",
+      "workflowId": "lib72j2AXLKSYytV",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

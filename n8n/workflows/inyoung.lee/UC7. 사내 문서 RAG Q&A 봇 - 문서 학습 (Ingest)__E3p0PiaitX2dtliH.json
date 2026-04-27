@@ -1,0 +1,267 @@
+{
+  "updatedAt": "2026-04-27T17:12:44.294Z",
+  "createdAt": "2026-04-27T17:12:44.294Z",
+  "id": "E3p0PiaitX2dtliH",
+  "name": "UC7. 사내 문서 RAG Q&A 봇 - 문서 학습 (Ingest)",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "uc7i-1",
+      "name": "수동 실행",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {},
+      "notes": "수동 실행 또는 주간 스케줄로 전환 가능"
+    },
+    {
+      "id": "uc7i-2",
+      "name": "Notion DB 페이지 목록",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        540,
+        300
+      ],
+      "parameters": {
+        "url": "={{ 'https://api.notion.com/v1/databases/' + $env.NOTION_API_KEY.split('_')[1] + '/query' }}",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.NOTION_API_KEY }}"
+            },
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"page_size\": 100 }",
+        "options": {}
+      },
+      "notes": "Notion DB 전체 페이지 목록 조회"
+    },
+    {
+      "id": "uc7i-3",
+      "name": "텍스트 추출 + 청크 분할",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const pages = $input.all();\nconst chunks = [];\n\nfor (const page of pages) {\n  const p = page.json;\n  const pageId = p.id?.replace(/-/g,'') ?? '';\n  const title = p.properties?.Name?.title?.[0]?.plain_text\n    ?? p.properties?.title?.title?.[0]?.plain_text\n    ?? p.properties?.[Object.keys(p.properties||{})[0]]?.title?.[0]?.plain_text\n    ?? 'Untitled';\n  const url = p.url ?? '';\n  \n  // Notion 페이지는 별도 content 조회 필요 - 여기서는 제목만 사용\n  const text = `${title}\\n(Notion 페이지: ${url})`;\n  const chunkSize = 1000;\n  \n  for (let i = 0; i < text.length; i += chunkSize) {\n    chunks.push({\n      json: {\n        id: `${pageId}_${Math.floor(i/chunkSize)}`,\n        text: text.slice(i, i + chunkSize),\n        metadata: {title, url, pageId, chunkIndex: Math.floor(i/chunkSize)}\n      }\n    });\n  }\n}\n\nreturn chunks.length > 0 ? chunks : [{json:{id:'empty',text:'',metadata:{}}}];"
+      },
+      "notes": "페이지 텍스트 주출 및 1000자 단위 청크 분할"
+    },
+    {
+      "id": "uc7i-4",
+      "name": "20개씩 배치",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "batchSize": 20,
+        "options": {}
+      },
+      "notes": "OpenAI Embeddings API 배치 제한"
+    },
+    {
+      "id": "uc7i-5",
+      "name": "OpenAI 임베딩",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/embeddings",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({model:'text-embedding-3-small', input:$json.text}) }}",
+        "options": {}
+      },
+      "notes": "text-embedding-3-small 벡터 생성"
+    },
+    {
+      "id": "uc7i-6",
+      "name": "Pinecone 포맷 변환",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const embedding = $json.data?.[0]?.embedding ?? [];\nconst prev = $input.item.json;\nreturn [{json:{\n  vectors: [{\n    id: $('텍스트 추출 + 청크 분할').item.json.id,\n    values: embedding,\n    metadata: $('텍스트 추출 + 청크 분할').item.json.metadata\n  }]\n}}];"
+      },
+      "notes": "Pinecone upsert 포맷으로 변환"
+    },
+    {
+      "id": "uc7i-7",
+      "name": "Pinecone Upsert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2040,
+        300
+      ],
+      "parameters": {
+        "url": "={{ 'https://' + $env.PINECONE_INDEX_HOST + '/vectors/upsert' }}",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "={{ $env.PINECONE_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "notes": "Pinecone에 벡터 저장"
+    }
+  ],
+  "connections": {
+    "수동 실행": {
+      "main": [
+        [
+          {
+            "node": "Notion DB 페이지 목록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion DB 페이지 목록": {
+      "main": [
+        [
+          {
+            "node": "텍스트 추출 + 청크 분할",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "텍스트 추출 + 청크 분할": {
+      "main": [
+        [
+          {
+            "node": "20개씩 배치",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20개씩 배치": {
+      "main": [
+        [
+          {
+            "node": "OpenAI 임베딩",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI 임베딩": {
+      "main": [
+        [
+          {
+            "node": "Pinecone 포맷 변환",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone 포맷 변환": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Upsert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "410a2c5d-ee7f-4d6c-938c-2603832ba458",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T17:12:44.294Z",
+      "createdAt": "2026-04-27T17:12:44.294Z",
+      "role": "workflow:owner",
+      "workflowId": "E3p0PiaitX2dtliH",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

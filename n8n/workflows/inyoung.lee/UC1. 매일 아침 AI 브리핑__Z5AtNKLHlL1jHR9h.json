@@ -1,0 +1,256 @@
+{
+  "updatedAt": "2026-04-27T23:29:10.296Z",
+  "createdAt": "2026-04-27T17:08:43.829Z",
+  "id": "Z5AtNKLHlL1jHR9h",
+  "name": "UC1. 매일 아침 AI 브리핑",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "uc1-1",
+      "name": "매일 9시 실행",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        304
+      ],
+      "notes": "매일 오전 9시 KST 실행"
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=Asia%2FSeoul",
+        "options": {}
+      },
+      "id": "uc1-2",
+      "name": "날씨 API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        304
+      ],
+      "notes": "open-meteo.com - API 키 불필요, 서울 날씨 (°C 직접 반환)"
+    },
+    {
+      "parameters": {
+        "url": "https://open.er-api.com/v6/latest/USD",
+        "options": {}
+      },
+      "id": "uc1-3",
+      "name": "환율 API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        688,
+        304
+      ],
+      "notes": "open.er-api.com - API 키 불필요, USD 기준 환율"
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko",
+        "options": {}
+      },
+      "id": "uc1-4",
+      "name": "뉴스 RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        912,
+        304
+      ],
+      "notes": "Google 뉴스 한국판 RSS - API 키 불필요"
+    },
+    {
+      "parameters": {
+        "jsCode": "const w = $('날씨 API').first().json;\nconst temp = Math.round(w.current?.temperature_2m ?? 0);\nconst humidity = w.current?.relative_humidity_2m ?? '-';\nconst wind = w.current?.wind_speed_10m ?? '-';\nconst code = w.current?.weather_code ?? 0;\nconst wmoDesc = {0:'맑음',1:'대체로 맑음',2:'구름 조금',3:'흐림',45:'안개',48:'안개',51:'이슬비',53:'이슬비',55:'이슬비',61:'비',63:'비',65:'강한 비',71:'눈',73:'눈',75:'강한 눈',80:'소나기',81:'소나기',82:'강한 소나기',95:'뇌우',96:'뇌우(우박)',99:'뇌우(우박)'};\nconst desc = wmoDesc[code] ?? '맑음';\n\nconst fx = $('환율 API').first().json;\nconst krw = fx.rates?.KRW ? Math.round(fx.rates.KRW).toLocaleString('ko-KR') : '?';\nconst jpy = fx.rates?.JPY ? fx.rates.JPY.toFixed(1) : '?';\nconst eur = fx.rates?.EUR ? fx.rates.EUR.toFixed(4) : '?';\n\nconst news = $input.all().slice(0,5).map((n,i)=>`${i+1}. ${n.json.title??''}`).join('\\n');\nconst today = new Date().toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul'});\n\nreturn [{\n  json: {\n    today,\n    weatherInfo: `${temp}°C, ${desc}, 습도 ${humidity}%, 바람 ${wind}m/s`,\n    fxInfo: `USD/KRW ${krw}원 / USD/JPY ${jpy}엔 / USD/EUR ${eur}`,\n    newsText: news\n  }\n}];"
+      },
+      "id": "uc1-5",
+      "name": "데이터 병합",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        304
+      ],
+      "notes": "날씨·환율·뉴스 정리 → OpenAI 노드에서 표현식으로 사용"
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "chatModel": "gpt-4o-mini",
+        "prompt": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "친근한 AI 브리핑 어시스턴트. 이모지를 적극 활용해 5~8줄의 슬랙 메시지를 작성하세요."
+            },
+            {
+              "content": "={{ $json.today + ' 아침 브리핑:\\n🌤 날씨(서울): ' + $json.weatherInfo + '\\n💱 환율: ' + $json.fxInfo + '\\n📰 주요 뉴스:\\n' + $json.newsText + '\\n\\n인사 → 날씨 한 줄 → 환율 핵심 한 줄 → 뉴스 3개 요약 → 마무리 한 줄' }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 600
+        },
+        "requestOptions": {}
+      },
+      "id": "uc1-6",
+      "name": "OpenAI 요약",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.1,
+      "position": [
+        1360,
+        304
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "2VGTGXVxR4dZHwyn",
+          "name": "OpenAI account"
+        }
+      },
+      "notes": "네이티브 OpenAI 노드 - gpt-4o-mini 브리핑 생성"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C09SNMPJAN7",
+          "mode": "list",
+          "cachedResultName": "test-workflow"
+        },
+        "text": "={{ $json.message.content }}",
+        "otherOptions": {}
+      },
+      "id": "uc1-7",
+      "name": "Slack 전송",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1584,
+        304
+      ],
+      "webhookId": "9576e167-2f5a-4133-a5a5-65d7bd9e61a2",
+      "credentials": {
+        "slackApi": {
+          "id": "eOrseztWQ59hCoro",
+          "name": "Slack account"
+        }
+      },
+      "notes": "네이티브 Slack 노드 - #general 전송"
+    }
+  ],
+  "connections": {
+    "매일 9시 실행": {
+      "main": [
+        [
+          {
+            "node": "날씨 API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "날씨 API": {
+      "main": [
+        [
+          {
+            "node": "환율 API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "환율 API": {
+      "main": [
+        [
+          {
+            "node": "뉴스 RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "뉴스 RSS": {
+      "main": [
+        [
+          {
+            "node": "데이터 병합",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "데이터 병합": {
+      "main": [
+        [
+          {
+            "node": "OpenAI 요약",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI 요약": {
+      "main": [
+        [
+          {
+            "node": "Slack 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "a3ee70cc-f675-4b77-9197-219e9a4bf8fd",
+  "activeVersionId": null,
+  "versionCounter": 18,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T17:08:43.829Z",
+      "createdAt": "2026-04-27T17:08:43.829Z",
+      "role": "workflow:owner",
+      "workflowId": "Z5AtNKLHlL1jHR9h",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

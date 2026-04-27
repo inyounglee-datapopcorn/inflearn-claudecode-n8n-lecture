@@ -1,0 +1,174 @@
+{
+  "updatedAt": "2026-04-26T17:35:18.224Z",
+  "createdAt": "2026-04-08T05:35:59.729Z",
+  "id": "JTOzMgc4mnPmvUjM",
+  "name": "[운영] Yes24 - 베스트셀러 CSV",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.yes24.com/Product/Category/BestSeller?categoryNumber=001&pageNumber=1&pageSize=24",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "ko-KR,ko;q=0.9"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "node-2",
+      "name": "Yes24 베스트셀러 페이지 요청",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        304
+      ],
+      "notes": "Yes24 베스트셀러 페이지 HTML을 텍스트로 수신"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) 날짜 범위 계산\nconst today = new Date();\nconst weekAgo = new Date(today);\nweekAgo.setDate(today.getDate() - 7);\nconst pad = (n) => String(n).padStart(2, '0');\nconst fmt = (d) => `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;\nconst standard_range = `${fmt(weekAgo)}~${fmt(today)}`;\n\n// 2) HTML 취득\nconst html = $input.first().json.data ?? $input.first().json.body ?? '';\nif (!html) throw new Error('HTML을 받지 못했습니다.');\n\n// 3) <li> 단위 분리 — item_info 클래스 포함 블록만 선별\nconst liParts = html.split(/<li(?:\\s[^>]*)?>/).slice(1);\nconst productParts = liParts.filter(p =>\n  /\\/product\\/goods\\/\\d+/.test(p) &&\n  /class=\"[^\"]*item_info[^\"]*\"/.test(p)\n);\n\n// 4) goods_no 기준 중복 제거\nconst seen = new Set();\nconst uniqueParts = [];\nfor (const part of productParts) {\n  const m = /\\/product\\/goods\\/(\\d+)/.exec(part);\n  if (m && !seen.has(m[1])) {\n    seen.add(m[1]);\n    uniqueParts.push({ goods_no: m[1], seg: part });\n  }\n}\n\nif (uniqueParts.length === 0) {\n  throw new Error(`파싱 실패.\\nHTML 첫 500자:\\n${html.slice(0, 500)}`);\n}\n\nconst stripTags = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst decodeHtml = (s) => s\n  .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')\n  .replace(/&#39;/g, \"'\").replace(/&quot;/g, '\"').replace(/&nbsp;/g, ' ');\n\nconst items = [];\nlet autoRank = 1;\n\nfor (const { goods_no, seg } of uniqueParts.slice(0, 24)) {\n  let title = '';\n  const titleRe = new RegExp(`href=\"\\\\/product\\\\/goods\\\\/${goods_no}\"[^>]*>([\\\\s\\\\S]*?)<\\/a>`, 'gi');\n  let tm;\n  while ((tm = titleRe.exec(seg)) !== null) {\n    const t = decodeHtml(stripTags(tm[1]));\n    if (t.length > 2) { title = t; break; }\n  }\n  title = title.replace(/\\s*새창이동.*$/i, '').trim();\n\n  const rankM = /<em[^>]*>\\s*(\\d{1,2})\\s*<\\/em>/i.exec(seg);\n  const ranking = rankM ? rankM[1] : String(autoRank);\n\n  const priceM = /class=\"[^\"]*info_price[^\"]*\"[\\s\\S]{0,400}?<strong[^>]*>[\\s\\S]{0,200}?<em[^>]*>([\\d,]+)<\\/em>/i.exec(seg);\n  const price = priceM ? priceM[1] : '';\n\n  const authM = /class=\"[^\"]*\\binfo_auth\\b[^\"]*\"[\\s\\S]{0,300}?<a[^>]*>([^<]{1,50})<\\/a>/i.exec(seg);\n  const author = authM ? decodeHtml(authM[1].trim()) : '';\n\n  const pubM = /class=\"[^\"]*\\binfo_pub\\b[^\"]*\"[\\s\\S]{0,300}?<a[^>]*>([^<]{2,60})<\\/a>/i.exec(seg);\n  const publisher = pubM ? decodeHtml(pubM[1].trim()) : '';\n\n  const plain = decodeHtml(stripTags(seg));\n  const dateM = /(\\d{4}년\\s*\\d{1,2}월)/.exec(plain);\n  const pub_date = dateM ? dateM[1].replace(/\\s+/g, ' ') : '';\n\n  items.push({\n    standard_range,\n    ranking,\n    goods_no,\n    image_url: `=IMAGE(\"https://image.yes24.com/goods/${goods_no}\")`,\n    goods_url: `https://www.yes24.com/product/goods/${goods_no}`,\n    title,\n    price,\n    author,\n    publisher,\n    pub_date,\n  });\n  autoRank++;\n}\n\nif (items.length === 0) {\n  throw new Error('필터링 후 유효한 항목이 없습니다.');\n}\n\nreturn items.map(item => ({ json: item }));",
+        "mode": "runOnceForAllItems"
+      },
+      "id": "node-3",
+      "name": "HTML 파싱 → 도서 목록",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        304
+      ],
+      "notes": "정규식으로 HTML 파싱 → 24개 도서 정보 추출"
+    },
+    {
+      "parameters": {
+        "options": {
+          "fileName": "={{ 'yes24_bestsellers_' + $now.format('yyyyMMdd') + '.csv' }}",
+          "headerRow": true
+        }
+      },
+      "id": "node-4",
+      "name": "CSV 파일 변환",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        912,
+        304
+      ],
+      "notes": "파싱된 도서 목록을 CSV 파일로 변환"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Yes24 베스트셀러 페이지 요청",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yes24 베스트셀러 페이지 요청": {
+      "main": [
+        [
+          {
+            "node": "HTML 파싱 → 도서 목록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML 파싱 → 도서 목록": {
+      "main": [
+        [
+          {
+            "node": "CSV 파일 변환",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "errorWorkflow": "1NkIDCDXFz9nRp1U"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "6de6b4f6-53cf-4772-bfcc-9ca8d81a1dbf",
+  "activeVersionId": null,
+  "versionCounter": 16,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-04-08T05:35:59.729Z",
+      "createdAt": "2026-04-08T05:35:59.729Z",
+      "role": "workflow:owner",
+      "workflowId": "JTOzMgc4mnPmvUjM",
+      "projectId": "5nyUdPwUVjqlj8kw",
+      "project": {
+        "updatedAt": "2026-04-07T06:41:36.560Z",
+        "createdAt": "2026-04-07T06:40:28.935Z",
+        "id": "5nyUdPwUVjqlj8kw",
+        "name": "dev dev <inyoung.lee@datapopcorn.ai>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3fb78973-2559-4bc0-b795-ae8d97b25abd"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "updatedAt": "2026-04-08T06:30:18.176Z",
+      "createdAt": "2026-04-08T06:30:18.176Z",
+      "id": "m44Sr1QP5GWaIRqh",
+      "name": "production"
+    },
+    {
+      "updatedAt": "2026-04-08T06:30:01.644Z",
+      "createdAt": "2026-04-08T06:30:01.644Z",
+      "id": "wrRUdz0u89cqCal0",
+      "name": "scraping"
+    }
+  ],
+  "activeVersion": null
+}
